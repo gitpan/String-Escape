@@ -1,28 +1,9 @@
-### String::Escape - Registry of string functions, including backslash escapes
+### String::Escape - Backslash escaping, word splitting, and elision functions
 
-### Copyright 1997, 1998 Evolution Online Systems, Inc.
-  # You may use this software for free under the terms of the Artistic License
+### Copyright 2002 Matthew Simon Cavalletto.
+  # You may use this software under the same terms as Perl.
 
-### Change History
-  # 1998-12-04 Folded String::Excerpt's elide() function into this module.
-  # 1998-09-19 Updated POD docs a bit.
-  # 1998-09-19 Support for function and array references in expand_escape_spec.
-  # 1998-09-01 Fixed return value from expand_escape_spec.
-  # 1998-07-31 Rewrote (un)qprintable to just call other functions in order.
-  # 1998-07-30 Expanded POD to cover use of new Makefile.PL.
-  # 1998-07-23 Combined word-boundary and non-word-boundary elide functions.
-  # 1998-07-23 Conventionalized POD, switched to yyyy.mm_dd version numbering.
-  # 1998-06-11 Modified printable and unprintable algorithms to use hash map.
-  # 1998-04-27 Anchored regexes in unprintable() to fix backslash mangling.
-  # 1998-03-16 Avoid constant modification via lexical rather than $_. -Simon
-  # 1998-02-25 Version 1.00 - String::Escape
-  # 1998-02-25 Moved to String:: and @EXPORT_OK for CPAN distribution - jeremy
-  # 1998-02-19 Started removal of sub add calls throughout Evo::Script
-  # 1997-11-13 Changed truncate's name to elide -- looks like keyword conflict?
-  # 1997-10-28 Created generic by-name interface; renamed printable().
-  # 1997-10-21 Altered quote_non_words regex to accept '-', '/', and '.'
-  # 1997-08-17 Created this package from functions in dictionary.pm. 
-  # 1997-03-?? Added shortenstring() to Evo::dictionary package. -Simon
+########################################################################
 
 package String::Escape;
 
@@ -32,11 +13,18 @@ use Carp;
 use Exporter;
 
 use vars qw( $VERSION @ISA @EXPORT_OK );
-$VERSION = 1998.12_04;
+$VERSION = 2002.001;
 
 push @ISA, qw( Exporter );
-push @EXPORT_OK, qw( escape printable unprintable elide );
-push @EXPORT_OK, qw( quote unquote quote_non_words qprintable unqprintable );
+push @EXPORT_OK, qw( 
+  escape 
+  printable unprintable 
+  elide 
+  quote unquote quote_non_words qprintable unqprintable
+  string2list string2hash list2string list2hash hash2string hash2list
+);
+
+########################################################################
 
 ### Call by-name interface
 
@@ -109,13 +97,15 @@ sub expand_escape_spec {
   }
 }
 
+########################################################################
+
 ### Double Quoting
 
 # $with_surrounding_quotes = quote( $string_value );
 sub quote ($) { '"' . $_[0] . '"' }
 
 # $remove_surrounding_quotes = quote( $string_value );
-sub unquote ($) { local $_ = $_[0]; s/\A\"(.*)\"\Z/$1/; $_; }
+sub unquote ($) { local $_ = $_[0]; s/\A\"(.*)\"\Z/$1/s; $_; }
 
 # $word_or_phrase_with_surrounding_quotes = quote( $string_value );
 sub quote_non_words ($) {
@@ -132,14 +122,14 @@ use vars qw( %Printable %Unprintable );
 # $special_characters_escaped = printable( $source_string );
 sub printable ($) {
   local $_ = ( defined $_[0] ? $_[0] : '' );
-  s/([\r\n\t\"\\\x00-\x1f\x7F-\xFF])/\\$Printable{$1}/g;
+  s/([\r\n\t\"\\\x00-\x1f\x7F-\xFF])/\\$Printable{$1}/sg;
   return $_;
 }
 
 # $original_string = unprintable( $special_characters_escaped );
 sub unprintable ($) {
   local $_ = ( defined $_[0] ? $_[0] : '' );
-  s/((?:\A|\G|[^\\]))\\([rRnNtT\"\\]|[\da-fA-F]{2})/$1.$Unprintable{lc($2)}/ge;
+  s/((?:\A|\G|[^\\]))\\([rRnNtT\"\\]|[\da-fA-F]{2})/$1.$Unprintable{lc($2)}/gse;
   return $_;
 }
 
@@ -148,6 +138,8 @@ sub qprintable ($) { quote_non_words printable $_[0] }
 
 # $original_string = unqprintable( quoted_and_escaped );
 sub unqprintable ($) { unprintable unquote $_[0] }
+
+########################################################################
 
 ### Elision
 
@@ -185,7 +177,78 @@ sub elide ($;$$) {
   return $excerpt . $Elipses;
 }
 
+########################################################################
+
+# @words = string2list( $space_separated_phrases );
+sub string2list {
+  my $text = shift;
+  
+  carp "string2list called with a non-text argument, '$text'" if (ref $text);
+  
+  my @words;
+  my $word = '';
+  
+  while ( defined $text and length $text ) {
+    if ($text =~ s/\A(?: ([^\"\s\\]+) | \\(.) )//mx) {
+      $word .= $1;
+    } elsif ($text =~ s/\A"((?:[^\"\\]|\\.)*)"//mx) {
+      $word .= $1;
+    } elsif ($text =~ s/\A\s+//m){
+      push(@words, unprintable($word));
+      $word = '';
+    } elsif ($text =~ s/\A"//) {
+      carp "string2list found an unmatched quote at '$text'"; 
+      return;
+    } else {
+      carp "string2list parse exception at '$text'";
+      return;
+    }
+  }
+  push(@words, unprintable($word));
+  
+  return @words;
+}
+
+# $space_sparated_string = list2string( @words );
+sub list2string {
+  join ( ' ', map qprintable($_), @_ );
+}
+
+# %hash = list2hash( @words );
+sub list2hash {
+  my @pairs;
+  foreach (@_) { 
+    my ($key, $val) = m/\A(.*?)(?:\=(.*))?\Z/s;
+    push @pairs, $key, $val;
+  }  
+  return @pairs;
+}
+
+# @words = hash2list( %hash );
+sub hash2list {
+  my @words;
+  while ( scalar @_ ) { 
+    my ($key, $value) = ( shift, shift );
+    push @words, qprintable($key) . '=' . qprintable($value) 
+  }
+  return @words;
+}
+
+# %hash = string2hash( $string );
+sub string2hash {
+  return list2hash( string2list( shift ) );
+}
+
+# $string = hash2string( %hash );
+sub hash2string {
+  join ( ' ', hash2list( @_ ) );
+}
+
+########################################################################
+
 1;
+
+__END__
 
 =pod
 
@@ -206,6 +269,16 @@ String::Escape - Registry of string functions, including backslash escapes
   # Shorten strings to fit, if necessary
   foreach (@_) { print elide( $_, 79 ) . "\n"; } 
   
+  use String::Escape qw( string2list list2string );
+  # Pack and unpack simple lists by quoting each item
+  $list = list2string( @list );
+  @list = string2list( $list );
+  
+  use String::Escape qw( string2hash hash2string );
+  # Pack and unpack simple hashes by quoting each item
+  $hash = hash2string( %hash );
+  %hash = string2hash( $hash );
+  
   use String::Escape qw( escape );
   # Defer selection of escaping routines until runtime
   $escape_name = $use_quotes ? 'qprintable' : 'printable';
@@ -216,10 +289,10 @@ String::Escape - Registry of string functions, including backslash escapes
 
 This module provides a flexible calling interface to some frequently-performed string conversion functions, including applying and removing C/Unix-style backslash escapes like \n and \t, wrapping and removing double-quotes, and truncating to fit within a desired length.
 
-The escape() function provides for dynamic selection of operations by using a package hash variable to map escape specification strings to the functions which implement them. The lookup imposes a bit of a performance penalty, but allows for some useful late-binding behaviour. Compound specifications (ex. 'quoted uppercase') are expanded to a list of functions to be applied in order. Other modules may also register their functions here for later general use.
+Furthermore, the escape() function provides for dynamic selection of operations by using a package hash variable to map escape specification strings to the functions which implement them. The lookup imposes a bit of a performance penalty, but allows for some useful late-binding behaviour. Compound specifications (ex. 'quoted uppercase') are expanded to a list of functions to be applied in order. Other modules may also register their functions here for later general use. (See the "CALLING BY NAME" section below for more.)
 
 
-=head1 REFERENCE
+=head1 FUNCTION REFERENCE
 
 =head2 Escaping And Unescaping Functions
 
@@ -234,7 +307,7 @@ Add double quote characters to each end of the string.
 
 =item quote_non_words($value) : $escaped
 
-As above, but only quotes empty, punctuated, and multiword values.
+As above, but only quotes empty, punctuated, and multiword values; simple values consisting of alphanumerics without special characters are not quoted.
 
 =item unquote($value) : $escaped
 
@@ -254,6 +327,36 @@ characters to their backslash-escaped equivalents and back again.
 The qprintable function applies printable escaping and then wraps the results 
 with quote_non_words, while unqprintable applies  unquote and then unprintable. 
 (Note that this is I<not> MIME quoted-printable encoding.)
+
+=back
+
+=head2 Simple Arrays and Hashes
+
+=over 4
+
+=item @words = string2list( $space_separated_phrases );
+
+Converts a space separated string of words and quoted phrases to an array;
+
+=item $space_sparated_string = list2string( @words );
+
+Joins an array of strings into a space separated string of words and quoted phrases;
+
+=item %hash = string2hash( $string );
+
+Converts a space separated string of equal-sign-associated key=value pairs into a simple hash.
+
+=item $string = hash2string( %hash );
+
+Converts a simple hash into a space separated string of equal-sign-associated key=value pairs.
+
+=item %hash = list2hash( @words );
+
+Converts an array of equal-sign-associated key=value strings into a simple hash.
+
+=item @words = hash2list( %hash );
+
+Converts a hash to an array of equal-sign-associated key=value strings.
 
 =back
 
@@ -287,8 +390,7 @@ The default word-boundary flexibility, used when the elide function is called wi
 
 =back
 
-
-=head2 Escape By-Name
+=head1 CALLING BY NAME
 
 These functions provide for the registration of string-escape specification 
 names and corresponding functions, and then allow the invocation of one or 
@@ -366,35 +468,84 @@ Return an unchanged copy of the original value.
 
 =head1 EXAMPLES
 
+Here are a few example uses of these functions, along with their output.
+
+=head2 Backslash Escaping
+
 C<print printable( "\tNow is the time\nfor all good folks\n" );>
 
-C<I<\tNow is the time\nfor all good folks\n>>
+  \tNow is the time\nfor all good folks\n
+
+C<print unprintable( '\\tNow is the time\\nfor all good folks\\n' );>
+
+	  Now is the time
+  for all good folks
+   
+
+
+=head2 Escape By Name
 
 C<print escape('qprintable', "\tNow is the time\nfor all good folks\n" );>
 
-C<I<"\tNow is the time\nfor all good folks\n">>
+  "\tNow is the time\nfor all good folks\n"
 
 C<print escape('uppercase qprintable', "\tNow is the time\nfor all good folks\n" );>
 
-C<I<"\tNOW IS THE TIME\nFOR ALL GOOD FOLKS\n">>
+  "\tNOW IS THE TIME\nFOR ALL GOOD FOLKS\n"
+
 
 C<print join '--', escape('printable', "\tNow is the time\n", "for all good folks\n" );>
 
-C<I<\tNow is the time\n--for all good folks\n>>
+  \tNow is the time\n--for all good folks\n
+
+
+=head2 String Elision Function
 
 C<$string = 'foo bar baz this that the other';>
 
 C<print elide( $string, 100 );>
 
-C<I<foo bar baz this that the other>>
+  foo bar baz this that the other
+
 
 C<print elide( $string, 12 );>
 
-C<I<foo bar...>>
+  foo bar...
+
 
 C<print elide( $string, 12, 0 );>
 
-C<I<foo bar b...>>
+  foo bar b...
+
+
+=head2 Simple Arrays and Hashes
+
+C<print list2string('hello', 'I move next march');>
+
+  hello "I move next march"
+
+
+C<@list = string2list('one "second item" 3 "four\nlines\nof\ntext"');>
+
+C<print $list[1];>
+
+  second item
+
+
+C<print hash2string( 'foo' =E<gt> 'Animal Cities', 'bar' =E<gt> 'Cheap' );>
+
+  foo="Animal Cities" bar=Cheap
+
+
+C<%hash = string2hash('key=value "undefined key" words="the cat in the hat"');>
+
+C<print $hash{'words'};>
+
+  the cat in the hat
+
+C<print exists $hash{'undefined_key'} and ! defined $hash{'undefined_key'};>
+
+  1
 
 
 =head1 PREREQUISITES AND INSTALLATION
@@ -415,30 +566,60 @@ discovered, but it should be considered "beta" pending that feedback.
   Name            DSLI  Description
   --------------  ----  ---------------------------------------------
   String::
-  ::Escape        bdpf  Escape by-name registry and useful functions
+  ::Escape        bdpf  Registry of useful string escaping functions
 
-Further information and support for this module is available at E<lt>www.evoscript.comE<gt>.
+Further information and support for this module is available at E<lt>www.evoscript.orgE<gt>.
 
-Please report bugs or other problems to E<lt>bugs@evoscript.comE<gt>.
+Please report bugs or other problems to C<E<lt>simonm@cavalletto.orgE<gt>>.
 
 The following changes are in progress or under consideration:
 
 =over 4
 
-=item Use word-boundary test in elide's regular expression rather than \s|\Z.
+=item *
 
-=item Compare with TOMC's String::Edit package.
+Use word-boundary test in elide's regular expression rather than \s|\Z.
+
+=item *
+
+Check for possible problems in the use of printable escaping functions and list2hash. For example, are the encoded strings for hashes with high-bit characters in their keys properly unquoted and unescaped?
+
+=item *
+
+Update string2list; among other things, embedded quotes (eg: a@"!a) shouldn't cause phrase breaks.
 
 =back
 
-=head1 AUTHORS AND COPYRIGHT
 
-Copyright 1997, 1998 Evolution Online Systems, Inc. E<lt>www.evolution.comE<gt>
+=head1 SEE ALSO
 
-You may use this software for free under the terms of the Artistic License. 
+Numerous modules provide collections of string manipulation functions; see L<String::Edit> for an example.
 
-Contributors: 
-M. Simon Cavalletto E<lt>simonm@evolution.comE<gt>,
-Jeremy G. Bishop E<lt>jeremy@evolution.comE<gt>
+The string2list function is similar to to the quotewords function in the standard distribution; see L<Text::ParseWords>.
+
+Use other packages to stringify more complex data structures; see L<Data::PropertyList>, L<Data::Dumper>, or other similar package.
+
+
+=head1 CREDITS AND COPYRIGHT
+
+=head2 Developed By
+
+  M. Simon Cavalletto, simonm@cavalletto.org
+  Evolution Softworks, www.evoscript.org
+
+=head2 Contributors 
+
+  Eleanor J. Evans piglet@piglet.org
+  Jeremy G. Bishop 
+
+=head2 Copyright
+
+Copyright 2002 Matthew Simon Cavalletto. 
+
+Portions copyright 1996, 1997, 1998, 2001 Evolution Online Systems, Inc.
+
+=head2 License
+
+You may use, modify, and distribute this software under the same terms as Perl.
 
 =cut
