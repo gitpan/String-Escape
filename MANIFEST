@@ -1,0 +1,5 @@
+MANIFEST
+README
+Makefile.PL
+lib/String/Escape.pm
+t/string-escape.t
