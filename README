@@ -1,18 +1,32 @@
-# String::Escape -- 1998.09_19
+# String::Escape -- 1998.1204
 
 Name            DSLI  Description
 --------------  ----  ---------------------------------------------
 String::
-::Escape        adpf  Escape by-name registry and useful functions
+::Escape        bdpf  Escape by-name registry and useful functions
 
-This module provides a flexible calling interface to some frequently-performed string conversion functions, including applying and removing C/Unix-style backslash escapes like \n and \t. 
+This module provides a flexible calling interface to some
+frequently-performed string conversion functions, including applying
+and expanding standard C/Unix-style backslash escapes like \n and \t, wrapping
+and removing double-quotes, and truncating to fit within a desired length.
 
-The escape() function provides for dynamic control of string manipulations by using a package hash variable to map escape specification strings to the functions which implement them. Compound specifications (ex. 'quoted uppercase') are expanded to a list of functions to be applied in order. 
+The escape() function provides for dynamic selection of operations by
+using a package hash variable to map escape specification strings to the
+functions which implement them. The lookup imposes a bit of a performance
+penalty, but allows for some useful late-binding behaviour. Compound
+specifications (ex. 'quoted uppercase') are expanded to a list of
+functions to be applied in order. Other modules may also register their
+functions here for later general use.
 
-This release of String::Escape is intended for public review and feedback. It has been tested in several environments and no major problems have been discovered, but it should be considered "alpha" pending that feedback.
+This release of String::Escape is intended for public review and
+feedback. It has been tested in several environments and no major
+problems have been discovered, but it should be considered "beta"
+pending that feedback.
 
-To install this package, download and unpack the distribution archive from http://www.evoscript.com/dist/String-Escape-1998.0919.tar.gz and execute the standard "perl Makefile.PL", "make test", "make install" sequence.
-  
+To install this package, download and unpack the distribution archive from
+http://www.evoscript.com/dist/ or your favorite CPAN mirror, and execute
+the standard "perl Makefile.PL", "make test", "make install" sequence.
+
 ---
 Copyright 1997, 1998 Evolution Online Systems, Inc.
 You may use this package for free under the terms of the Artistic License.

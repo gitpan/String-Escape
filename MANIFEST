@@ -1,5 +1,7 @@
 MANIFEST
-README
 Makefile.PL
+README
 lib/String/Escape.pm
-t/string-escape.t
+t/backslash.t
+t/elide.t
+t/escape.t

@@ -3,14 +3,14 @@
 ### Copyright 1997, 1998 Evolution Online Systems, Inc.
   # You may use this software for free under the terms of the Artistic License
 
-### To Do:
-  # - Compare with TOMC's String::Edit package.
-
 ### Change History
+  # 1998-12-04 Folded String::Excerpt's elide() function into this module.
+  # 1998-09-19 Updated POD docs a bit.
   # 1998-09-19 Support for function and array references in expand_escape_spec.
   # 1998-09-01 Fixed return value from expand_escape_spec.
   # 1998-07-31 Rewrote (un)qprintable to just call other functions in order.
   # 1998-07-30 Expanded POD to cover use of new Makefile.PL.
+  # 1998-07-23 Combined word-boundary and non-word-boundary elide functions.
   # 1998-07-23 Conventionalized POD, switched to yyyy.mm_dd version numbering.
   # 1998-06-11 Modified printable and unprintable algorithms to use hash map.
   # 1998-04-27 Anchored regexes in unprintable() to fix backslash mangling.
@@ -18,22 +18,24 @@
   # 1998-02-25 Version 1.00 - String::Escape
   # 1998-02-25 Moved to String:: and @EXPORT_OK for CPAN distribution - jeremy
   # 1998-02-19 Started removal of sub add calls throughout Evo::Script
+  # 1997-11-13 Changed truncate's name to elide -- looks like keyword conflict?
   # 1997-10-28 Created generic by-name interface; renamed printable().
   # 1997-10-21 Altered quote_non_words regex to accept '-', '/', and '.'
-  # 1997-08-17 Created this package from functions in dictionary.pm. -Simon
+  # 1997-08-17 Created this package from functions in dictionary.pm. 
+  # 1997-03-?? Added shortenstring() to Evo::dictionary package. -Simon
 
 package String::Escape;
 
 require 5;
 use strict;
 use Carp;
+use Exporter;
 
 use vars qw( $VERSION @ISA @EXPORT_OK );
-$VERSION = 1998.09_19;
+$VERSION = 1998.12_04;
 
-use Exporter;
 push @ISA, qw( Exporter );
-push @EXPORT_OK, qw( escape printable unprintable );
+push @EXPORT_OK, qw( escape printable unprintable elide );
 push @EXPORT_OK, qw( quote unquote quote_non_words qprintable unqprintable );
 
 ### Call by-name interface
@@ -57,6 +59,8 @@ use vars qw( %Escapes );
   
   'qprintable' => 'printable quote_non_words',
   'unqprintable' => 'unquote unprintable',
+  
+  'elide' => \&elide,
 );
 
 # String::Escape::add( $name, $subroutine );
@@ -64,23 +68,6 @@ sub add ($$) { $Escapes{ shift(@_) } = shift(@_); }
 
 # @defined_names = String::Escape::names();
 sub names () { keys(%Escapes); }
-
-# @escape_functions = expand_escape_spec($escape_spec);
-sub expand_escape_spec {
-  my $escape_spec = shift;
-  
-  if ( ref($escape_spec) eq 'CODE' ) {
-    return $escape_spec;
-  } elsif ( ref($escape_spec) eq 'ARRAY' ) {
-    return map { expand_escape_spec($_) } @$escape_spec;
-  } elsif ( ! ref($escape_spec) ) {
-    return map { expand_escape_spec($_) }
-      map { $Escapes{$_} or croak "unsupported escape specification '$_'" }
-        split(/\s+/, $escape_spec);
-  } else {
-    croak "unsupported escape specification '$escape_spec'";
-  }
-}
 
 # $escaped = escape($escape_spec, $value); 
 # @escaped = escape($escape_spec, @values);
@@ -91,7 +78,7 @@ sub escape ($@) {
       if ($#values > 0 && ! wantarray);
   
   my @escapes = expand_escape_spec($escape_spec);
-  
+  # warn "Escaping: ". join(' ', @escapes) . "\n";
   my ($value, $escaper);
   foreach $value ( @values ) {
     foreach $escaper ( @escapes ) {
@@ -100,6 +87,26 @@ sub escape ($@) {
   }
   
   return wantarray ? @values : $values[0];
+}
+
+# @escape_functions = expand_escape_spec($escape_spec);
+sub expand_escape_spec {
+  my $escape_spec = shift;
+  
+  if ( ref($escape_spec) eq 'CODE' ) {
+    return $escape_spec;
+  } elsif ( ref($escape_spec) eq 'ARRAY' ) {
+    return map { expand_escape_spec($_) } @$escape_spec;
+  } elsif ( ! ref($escape_spec) ) {
+    return map { 
+      expand_escape_spec($_) 
+    } map { 
+      $Escapes{$_} or croak "unsupported escape specification '$_'; " . 
+			    "should be one of " . join(', ', names())
+    } split(/\s+/, $escape_spec);
+  } else {
+    croak "unsupported escape specification '$escape_spec'";
+  }
 }
 
 ### Double Quoting
@@ -142,6 +149,42 @@ sub qprintable ($) { quote_non_words printable $_[0] }
 # $original_string = unqprintable( quoted_and_escaped );
 sub unqprintable ($) { unprintable unquote $_[0] }
 
+### Elision
+
+use vars qw( $Elipses $DefaultLength $DefaultStrictness );
+$Elipses = '...';
+$DefaultLength = 60;
+$DefaultStrictness = 10;
+
+# $elided_string = elide($string);
+# $elided_string = elide($string, $length);
+# $elided_string = elide($string, $length, $word_boundary_strictness);
+  # Return a single-quoted, shortened version of the string, with ellipsis
+sub elide ($;$$) {
+  my $source = shift;
+  my $length = scalar(@_) ? shift() : $DefaultLength;
+  my $word_limit = scalar(@_) ? shift() : $DefaultStrictness;
+  
+  # If the source is already short, we don't need to do anything
+  return $source if (length($source) < $length);
+  
+  # Leave room for the elipses and make sure we include at least one character.
+  $length -= length( $Elipses );
+  $length = 1 if ( $length < 1 );
+  
+  my $excerpt;
+  
+  # Try matching $length characters or less at a word boundary.
+  $excerpt = ( $source =~ /^(.{0,$length})(?:\s|\Z)/ )[0] if ( $word_limit );
+  
+  # Ignore boundaries if that fails or returns much less than we wanted.
+  $excerpt = substr($source, 0, $length) if ( ! defined $excerpt or 
+  	length($excerpt) < length($source) and
+	! length($excerpt) || abs($length - length($excerpt)) > $word_limit);
+  
+  return $excerpt . $Elipses;
+}
+
 1;
 
 =pod
@@ -153,27 +196,27 @@ String::Escape - Registry of string functions, including backslash escapes
 
 =head1 SYNOPSIS
 
-C<use String::Escape qw( printable unprintable );>
-
-C<$output = printable($value);>
-
-C<$value = unprintable($input);>
-
-C<use String::Escape qw( escape );>
-
-C<$escape_name = $use_quotes ? 'qprintable' : 'printable';> 
-
-C<@escaped = escape($escape_name, @values);>
+  use String::Escape qw( printable unprintable );
+  # Convert control, high-bit chars to \n or \xxx escapes
+  $output = printable($value);
+  # Convert escape sequences back to original chars
+  $value = unprintable($input);
+  
+  use String::Escape qw( elide );
+  # Shorten strings to fit, if necessary
+  foreach (@_) { print elide( $_, 79 ) . "\n"; } 
+  
+  use String::Escape qw( escape );
+  # Defer selection of escaping routines until runtime
+  $escape_name = $use_quotes ? 'qprintable' : 'printable';
+  @escaped = escape($escape_name, @values);
 
 
 =head1 DESCRIPTION
 
-This module provides a flexible calling interface to some frequently-performed string conversion functions, including applying and removing C/Unix-style backslash escapes. For example, to inspect the line feeds and high-bit characters in a file you could use String::Escape's printable function:
+This module provides a flexible calling interface to some frequently-performed string conversion functions, including applying and removing C/Unix-style backslash escapes like \n and \t, wrapping and removing double-quotes, and truncating to fit within a desired length.
 
-    > perl -MString::Escape=printable -n -e 'print printable($_)."\n"' < ~/.cshrc
-    unset auto-logout\t\t# minimal shell setup\n
-
-The escape() function provides for dynamic selection of operations by using a package hash variable to map escape specification strings to the functions which implement them. The lookup imposes a bit of a performance penalty, but allows for some useful late-binding behaviour. Compound specifications (ex. 'quoted uppercase') are expanded to a list of functions to be applied in order. (Other modules may also register their functions here for later general use.)
+The escape() function provides for dynamic selection of operations by using a package hash variable to map escape specification strings to the functions which implement them. The lookup imposes a bit of a performance penalty, but allows for some useful late-binding behaviour. Compound specifications (ex. 'quoted uppercase') are expanded to a list of functions to be applied in order. Other modules may also register their functions here for later general use.
 
 
 =head1 REFERENCE
@@ -213,6 +256,37 @@ with quote_non_words, while unqprintable applies  unquote and then unprintable.
 (Note that this is I<not> MIME quoted-printable encoding.)
 
 =back
+
+=head2 String Elision Function
+
+This function extracts the leading portion of a provided string and appends ellipsis if it's longer than the desired maximum excerpt length.
+
+=over 4
+
+=item elide($string) : $elided_string
+
+=item elide($string, $length) : $elided_string
+
+=item elide($string, $length, $word_boundary_strictness) : $elided_string
+
+If the original string is shorter than $length, it is returned unchanged. At most $length characters are returned; if called with a single argument, $length defaults to $DefaultLength. 
+
+Up to $word_boundary_strictness additional characters may be ommited in order to make the elided portion end on a word boundary; you can pass 0 to ignore word boundaries. If not provided, $word_boundary_strictness defaults to $DefaultStrictness.
+
+=item $Elipses
+
+The string of characters used to indicate the end of the excerpt. Initialized to '...'.
+
+=item $DefaultLength
+
+The default target excerpt length, used when the elide function is called with a single argument. Initialized to 60.
+
+=item $DefaultStrictness
+
+The default word-boundary flexibility, used when the elide function is called without the third argument. Initialized to 10.
+
+=back
+
 
 =head2 Escape By-Name
 
@@ -273,6 +347,8 @@ By default, the %Escapes hash is initialized to contain the following mappings:
 
 =item printable, unprintable, qprintable, or unqprintable, 
 
+=item elide
+
 Run the above-described functions of the same names.  
 
 =item uppercase, lowercase, or initialcase
@@ -306,44 +382,54 @@ C<print join '--', escape('printable', "\tNow is the time\n", "for all good folk
 
 C<I<\tNow is the time\n--for all good folks\n>>
 
+C<$string = 'foo bar baz this that the other';>
+
+C<print elide( $string, 100 );>
+
+C<I<foo bar baz this that the other>>
+
+C<print elide( $string, 12 );>
+
+C<I<foo bar...>>
+
+C<print elide( $string, 12, 0 );>
+
+C<I<foo bar b...>>
+
 
 =head1 PREREQUISITES AND INSTALLATION
 
 This package should run on any standard Perl 5 installation.
 
-You may retrieve this package from the below URL:
-  http://www.evoscript.com/dist/String-Escape-1998.0919.tar.gz
-
-To install this package, download and unpack the distribution archive, then:
-
-=over 4
-
-=item * C<perl Makefile.PL>
-
-=item * C<make test>
-
-=item * C<make install>
-
-=item * C<perldoc String::Escape>
-
-=back
+To install this package, download and unpack the distribution archive from
+http://www.evoscript.com/dist/ or your favorite CPAN mirror, and execute
+the standard "perl Makefile.PL", "make test", "make install" sequence.
 
 
 =head1 STATUS AND SUPPORT
 
 This release of String::Escape is intended for public review and feedback. 
 It has been tested in several environments and no major problems have been 
-discovered, but it should be considered "alpha" pending that feedback.
+discovered, but it should be considered "beta" pending that feedback.
 
   Name            DSLI  Description
   --------------  ----  ---------------------------------------------
   String::
-  ::Escape        adpf  Escape by-name registry and useful functions
+  ::Escape        bdpf  Escape by-name registry and useful functions
 
 Further information and support for this module is available at E<lt>www.evoscript.comE<gt>.
 
 Please report bugs or other problems to E<lt>bugs@evoscript.comE<gt>.
 
+The following changes are in progress or under consideration:
+
+=over 4
+
+=item Use word-boundary test in elide's regular expression rather than \s|\Z.
+
+=item Compare with TOMC's String::Edit package.
+
+=back
 
 =head1 AUTHORS AND COPYRIGHT
 
