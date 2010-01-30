@@ -1,9 +1,4 @@
-# String::Escape -- 1998.1204
-
-Name            DSLI  Description
---------------  ----  ---------------------------------------------
-String::
-::Escape        bdpf  Escape by-name registry and useful functions
+String::Escape
 
 This module provides a flexible calling interface to some
 frequently-performed string conversion functions, including applying
@@ -18,15 +13,48 @@ specifications (ex. 'quoted uppercase') are expanded to a list of
 functions to be applied in order. Other modules may also register their
 functions here for later general use.
 
-This release of String::Escape is intended for public review and
-feedback. It has been tested in several environments and no major
-problems have been discovered, but it should be considered "beta"
-pending that feedback.
 
-To install this package, download and unpack the distribution archive from
-http://www.evoscript.com/dist/ or your favorite CPAN mirror, and execute
-the standard "perl Makefile.PL", "make test", "make install" sequence.
+INSTALLATION
 
----
-Copyright 1997, 1998 Evolution Online Systems, Inc.
-You may use this package for free under the terms of the Artistic License.
+To install this module, run the following commands:
+
+	perl Makefile.PL
+	make
+	make test
+	make install
+
+
+SUPPORT AND DOCUMENTATION
+
+After installing, you can find documentation for this module with the
+perldoc command.
+
+    perldoc String::Escape
+
+You can also look for information at:
+
+    RT, CPAN's request tracker
+        http://rt.cpan.org/NoAuth/Bugs.html?Dist=String-Escape
+
+    AnnoCPAN, Annotated CPAN documentation
+        http://annocpan.org/dist/String-Escape
+
+    CPAN Ratings
+        http://cpanratings.perl.org/d/String-Escape
+
+    Search CPAN
+        http://search.cpan.org/dist/String-Escape/
+
+
+LICENSE AND COPYRIGHT
+
+Copyright (C) 2002, 2010 Matthew Simon Cavalletto.
+
+Portions copyright 1996, 1997, 1998, 2001 Evolution Online Systems, Inc.
+
+This program is free software; you can redistribute it and/or modify it
+under the terms of either: the GNU General Public License as published
+by the Free Software Foundation; or the Artistic License.
+
+See http://dev.perl.org/licenses/ for more information.
+
