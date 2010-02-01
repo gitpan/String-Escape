@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               String-Escape
-version:            2010.001
+version:            2010.002
 abstract:           Backslash escapes, quoted phrase, word elision, etc.
 author:
     - Matthew Simon Cavalletto <simonm@cavalletto.org>

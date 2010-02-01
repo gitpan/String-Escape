@@ -5,8 +5,8 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     NAME                => 'String::Escape',
     AUTHOR              => q{Matthew Simon Cavalletto <simonm@cavalletto.org>},
-    VERSION_FROM        => 'lib/String/Escape.pm',
-    ABSTRACT_FROM       => 'lib/String/Escape.pm',
+    VERSION_FROM        => 'Escape.pm',
+    ABSTRACT_FROM       => 'Escape.pm',
     ( $ExtUtils::MakeMaker::VERSION >= 6.3002
     	? ('LICENSE'=> 'perl')
     	: ()

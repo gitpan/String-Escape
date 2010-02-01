@@ -5,7 +5,7 @@ use strict;
 use Test::More( tests => 22 );
 
 BEGIN { 
-	use_ok( 'String::Escape', qw( evalable unevalable qevalable unqevalable ) ) 
+	use_ok( 'String::Escape', qw( backslash unbackslash qqbackslash unqqbackslash ) ) 
 }
 
 { 
@@ -14,8 +14,8 @@ BEGIN {
 	my $original = "\tNow is the time\nfor all good folk\nto party.\n";
 	my $expected = '\\tNow is the time\\nfor all good folk\\nto party.\\n';
 
-	is( evalable( $original ) => $expected );
-	is( unevalable( $expected ) => $original );
+	is( backslash( $original ) => $expected );
+	is( unbackslash( $expected ) => $original );
 	is( eval( qq{"$expected"} ) => $original );
 }
 
@@ -25,8 +25,8 @@ BEGIN {
 	my $original = "\tNow is the time\nfor all good folk\nto party.\n";
 	my $expected = '"\\tNow is the time\\nfor all good folk\\nto party.\\n"';
 
-	is( qevalable( $original ) => $expected );
-	is( unqevalable( $expected ) => $original );
+	is( qqbackslash( $original ) => $expected );
+	is( unqqbackslash( $expected ) => $original );
 	is( eval( $expected ) => $original );
 }
 
@@ -35,8 +35,8 @@ BEGIN {
 
 	my $original = "";
 
-	is( evalable( $original ) => $original );
-	is( unevalable( $original ) => $original );
+	is( backslash( $original ) => $original );
+	is( unbackslash( $original ) => $original );
 }
 
 { 
@@ -46,9 +46,9 @@ BEGIN {
 	my $expected = '"four \\\\ three"';
 
 	is( eval( $expected ) => $original );
-	is( qevalable( $original ) => $expected );
-	is( unqevalable( $expected ) => $original );
-	is( eval( qevalable( $original ) ) => $original );
+	is( qqbackslash( $original ) => $expected );
+	is( unqqbackslash( $expected ) => $original );
+	is( eval( qqbackslash( $original ) ) => $original );
 }
 
 { 
@@ -57,8 +57,8 @@ BEGIN {
 	my $original = "this\tis\ta\011string\x09with some text\r\n";
 	my $expected = '"this\\tis\\ta\\tstring\\twith some text\\r\\n"';
 
-	is( qevalable( $original ) => $expected );
-	is( unqevalable( $expected ) => $original );
+	is( qqbackslash( $original ) => $expected );
+	is( unqqbackslash( $expected ) => $original );
 	is( eval( $expected ) => $original );
 }
 
@@ -68,8 +68,8 @@ BEGIN {
 	my $original = undef;
 	my $expected = "";
 
-	is( evalable( $original ) => $expected );
-	is( unevalable( $original ) => $expected );
+	is( backslash( $original ) => $expected );
+	is( unbackslash( $original ) => $expected );
 }
 
 { 
@@ -78,8 +78,8 @@ BEGIN {
 	my $original = " this\nis a¼ ªtest.º \\quote\\ endquote.";
 	my $expected = '" this\\nis a\xbc \\xaatest.\\xba \\\\quote\\\\ endquote."';
 
-	is( qevalable( $original ) => $expected );
-	is( unqevalable( $expected ) => $original );
-	is( unevalable( evalable( $original ) ) => $original );
+	is( qqbackslash( $original ) => $expected );
+	is( unqqbackslash( $expected ) => $original );
+	is( unbackslash( backslash( $original ) ) => $original );
 	is( eval( $expected ) => $original );
 }

@@ -1,9 +1,12 @@
 Revision History for String::Escape
 
+- 2010-02-01 Uploaded version 2010.002 to CPAN.
+- 2010-02-01 Renamed newly created functions to *backslash() and tweaked docs.
+
 - 2010-01-30 Uploaded version 2010.001_1 to CPAN as a developer release.
 - 2010-01-30 Added tests for new functions and previous bug reports. 
-- 2010-01-29 Added new functions with better support for Perl string syntax 
-             based on email exchange with Brad Bowman.
+- 2010-01-29 Added new functions with support for more of the escapes used in 
+             Perl's own syntax, based on email exchange with Brad Bowman.
 - 2010-01-29 Changed unprintable to accept optional x in \xFF escapes as per
              discussion at PerlMonks: http://perlmonks.org/?node_id=461186
 - 2010-01-29 Added META.yml as requested in RT 41226 by Alexandr Ciornii.
